@@ -16,7 +16,6 @@ console.log("Package requirement:", goal)
 
 /** LLM call */
 async function generate(input: string) {
-  // 例として gpt-5.4-mini を使用
   const res = await client.responses.create({ model: "gpt-5.4-mini", input })
   return res.output_text
 }
@@ -36,8 +35,10 @@ Rules:
 - Prefer packages with healthy adoption (many downloads)
 - Prefer packages with clear TypeScript support
 - Check license and ensure it's reasonably permissive
-- Compare the numbers of dependencies. It's better to have less dependencies
-- Avoid too bloated packages
+- It's better to have less dependencies
+- Check the latest version of recommended package
+- get_info tool is used for checking the version number
+- search tool is used for getting candidate packages
 - Mention tradeoffs, not only the winner
 - Do not invent facts; use tools
 
@@ -53,10 +54,12 @@ Available tools:
     - bad search arg: "npm date time library frontend TypeScript popular maintained"
 - get_info: get package info
   - example: {"tool":"get_info","arg":"package-name"}
+  - the result include the version numbers of the package
 
 Or, when finished:
 Answer: {
   "recommended": "...",
+  "latestVersion": "x.y.z",
   "alternatives": ["..."],
   "reasons": ["..."],
   "tradeoffs": ["..."]
@@ -153,7 +156,7 @@ for (let i = 0; i < MAX_ATTEMPT; i++) {
       break
     }
     case "get_info": {
-      const observation = await getInfoTool(act.tool)
+      const observation = await getInfoTool(act.arg)
       console.log("Observation: ", observation.slice(0, 100) + "...")
       messages.push("Observation: " + observation)
       break
