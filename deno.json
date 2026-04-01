@@ -1,0 +1,10 @@
+{
+  "fmt": {
+    "semiColons": false
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-process-global"]
+    }
+  }
+}
