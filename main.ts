@@ -25,8 +25,8 @@ const SYSTEM_PROMPT = `
 You are a npm package selection agent.
 
 Your job is to choose the best npm package for the user's requirements.
-- Think about what information is missing
-- Call exactly one tool when needed
+- Collect missing information using tools
+- Call one tool each time
 - Observe the result
 - Continue until you can make a recommendation
 
@@ -34,13 +34,7 @@ Rules:
 - Prefer actively maintained packages
 - Prefer packages with healthy adoption (many downloads)
 - Prefer packages with clear TypeScript support
-- Check license and ensure it's reasonably permissive
-- It's better to have less dependencies
-- Check the latest version of recommended package
-- get_info tool is used for checking the version number
-- search tool is used for getting candidate packages
 - Mention tradeoffs, not only the winner
-- Do not invent facts; use tools
 
 Output format:
 Thought: ...
@@ -50,16 +44,17 @@ Available tools:
 - search: search npm registry
   - example: {"tool":"search","arg":"query string"}
   - Note: npm search only support search by main topic
-    - good search arg: "date"
+    - good search arg: "date", "markdown", "http client"
     - bad search arg: "npm date time library frontend TypeScript popular maintained"
-- get_info: get package info
+- get_info: get package info including
   - example: {"tool":"get_info","arg":"package-name"}
-  - the result include the version numbers of the package
+  - the correct version number can be only obtained by this tool
 
 Or, when finished:
 Answer: {
   "recommended": "...",
   "latestVersion": "x.y.z",
+  "license": "license name",
   "alternatives": ["..."],
   "reasons": ["..."],
   "tradeoffs": ["..."]
@@ -85,17 +80,22 @@ async function searchTool(query: string) {
   )
   const { objects } = await res.json()
   return objects.map((o: any) => ({
-    downloads: o.downloads,
+    downloads: o.downloads.weekly,
     dependents: o.dependents,
-    updated: o.updated,
     name: o.package.name,
-    description: o.package.description,
   }))
 }
 
 async function getInfoTool(pkg: string) {
   const res = await fetch("https://registry.npmjs.org/" + pkg)
-  return await res.text()
+  const info = await res.json()
+  return {
+    name: info.name,
+    description: info.description,
+    license: info.license,
+    readme: info.readme?.slice(0, 3000),
+    latestVersion: info?.["dist-tags"]?.latest,
+  }
 }
 
 function parse(text: string): StepResult {
@@ -145,23 +145,20 @@ for (let i = 0; i < MAX_ATTEMPT; i++) {
 
   messages.push("Thought: " + thought, "Act: " + JSON.stringify(act))
 
+  let observation: string
   switch (act.tool) {
     case "search": {
-      const observation = await searchTool(act.arg)
-      console.log(
-        "Observation: ",
-        JSON.stringify(observation).slice(0, 100) + "...",
-      )
-      messages.push("Observation: " + JSON.stringify(observation))
+      observation = JSON.stringify(await searchTool(act.arg))
       break
     }
     case "get_info": {
-      const observation = await getInfoTool(act.arg)
-      console.log("Observation: ", observation.slice(0, 100) + "...")
-      messages.push("Observation: " + observation)
+      observation = JSON.stringify(await getInfoTool(act.arg))
       break
     }
     default:
       act satisfies never
+      throw new Error("Unknown tool " + JSON.stringify(act))
   }
+  console.log("Observation: ", observation!.slice(0, 100) + "...")
+  messages.push("Observation: " + observation)
 }
