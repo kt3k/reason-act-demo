@@ -75,6 +75,10 @@ Answer: {
 }
 ```
 
+## Blog article
+
+https://zenn.dev/kt3k/articles/74785af8436b1e
+
 ## License
 
 MIT
